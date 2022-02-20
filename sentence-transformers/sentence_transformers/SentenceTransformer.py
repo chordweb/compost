@@ -570,6 +570,7 @@ class SentenceTransformer(nn.Sequential):
             warmup_steps: int = 10000,
             optimizer_class: Type[Optimizer] = transformers.AdamW,
             optimizer_params : Dict[str, object]= {'lr': 2e-5},
+            specified_optimizers = None,
             weight_decay: float = 0.01,
             evaluation_steps: int = 0,
             output_path: str = None,
@@ -648,20 +649,24 @@ class SentenceTransformer(nn.Sequential):
 
         # Prepare optimizers
         optimizers = []
+        if specified_optimizers is None:
+            optimizers = specified_optimizers
         schedulers = []
         for loss_model in loss_models:
-            param_optimizer = list(loss_model.named_parameters())
+            if specified_optimizers is None:
+                param_optimizer = list(loss_model.named_parameters())
 
-            no_decay = ['bias', 'LayerNorm.bias', 'LayerNorm.weight']
-            optimizer_grouped_parameters = [
-                {'params': [p for n, p in param_optimizer if not any(nd in n for nd in no_decay)], 'weight_decay': weight_decay},
-                {'params': [p for n, p in param_optimizer if any(nd in n for nd in no_decay)], 'weight_decay': 0.0}
-            ]
+                no_decay = ['bias', 'LayerNorm.bias', 'LayerNorm.weight']
+                optimizer_grouped_parameters = [
+                    {'params': [p for n, p in param_optimizer if not any(nd in n for nd in no_decay)], 'weight_decay': weight_decay},
+                    {'params': [p for n, p in param_optimizer if any(nd in n for nd in no_decay)], 'weight_decay': 0.0}
+                ]
 
-            optimizer = optimizer_class(optimizer_grouped_parameters, **optimizer_params)
+                optimizer = optimizer_class(optimizer_grouped_parameters, **optimizer_params)
+                optimizers.append(optimizer)
             scheduler_obj = self._get_scheduler(optimizer, scheduler=scheduler, warmup_steps=warmup_steps, t_total=num_train_steps)
 
-            optimizers.append(optimizer)
+
             schedulers.append(scheduler_obj)
 
 
