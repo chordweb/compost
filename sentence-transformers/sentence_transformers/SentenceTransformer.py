@@ -561,6 +561,29 @@ class SentenceTransformer(nn.Sequential):
         else:
             return sum([len(t) for t in text])      #Sum of length of individual strings
 
+    def construct_optimizers(self,
+            train_objectives: Iterable[Tuple[DataLoader, nn.Module]],
+            optimizer_class: Type[Optimizer] = transformers.AdamW,
+            optimizer_params : Dict[str, object]= {'lr': 2e-5},
+            ):
+        #the optimizers used here are a bit non-standard, and the differential rivacy engine requires construction of them before training
+        optimizers = []
+        loss_models = [loss for _, loss in train_objectives]
+        for loss_model in loss_models:
+            param_optimizer = list(loss_model.named_parameters())
+            no_decay = ['bias', 'LayerNorm.bias', 'LayerNorm.weight']
+            optimizer_grouped_parameters = [
+                {'params': [p for n, p in param_optimizer if not any(nd in n for nd in no_decay)], 'weight_decay': weight_decay},
+                {'params': [p for n, p in param_optimizer if any(nd in n for nd in no_decay)], 'weight_decay': 0.0}
+            ]
+
+            optimizer = optimizer_class(optimizer_grouped_parameters, **optimizer_params)
+            optimizers.append(optimizer)
+
+        return optimizers
+
+
+
     def fit(self,
             train_objectives: Iterable[Tuple[DataLoader, nn.Module]],
             evaluator: SentenceEvaluator = None,
@@ -649,7 +672,7 @@ class SentenceTransformer(nn.Sequential):
 
         # Prepare optimizers
         optimizers = []
-        if specified_optimizers is None:
+        if specified_optimizers is not None:
             optimizers = specified_optimizers
         schedulers = []
         for loss_model in loss_models:
