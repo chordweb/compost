@@ -17,4 +17,8 @@ def hello_world():
     res = do_ml(bio, groups)
     return {"matches": res}
 
+@app.route("/hi")
+def hello():
+    return "hello"
+
 app.run(port=7070)
